@@ -1,0 +1,40 @@
+openapi: 3.1.0
+info:
+  title: Mapache MCP Bridge
+  version: "1.0.0"
+servers:
+  - url: https://YOUR-BRIDGE-URL
+paths:
+  /run:
+    post:
+      operationId: run
+      description: Run an MCP-enabled agent against the user's prompt.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:
+                  type: string
+                  description: The user's instruction for the agent.
+      responses:
+        "200":
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  output: { type: string }
+                  toolEvents: { type: array, items: { type: object } }
+                  citations: { type: array, items: { type: object } }
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
