@@ -1,16 +1,14 @@
 {
-   "name": "mapache-mcp-bridge",
-   "private": true,
-   "type": "module",
-   "scripts": {
-     "dev": "node --env-file=.env --watch src/server.js",
-     "start": "node src/server.js"
-   },
-   "dependencies": {
--    "@openai/agents": "^0.4.0",
-+    "@openai/agents": "^0.0.17",
-     "cors": "^2.8.5",
-     "express": "^4.19.2"
-   },
-+  "engines": { "node": ">=20" }
+  "name": "mapache-mcp-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@openai/agents": "0.0.17",
+    "cors": "2.8.5",
+    "express": "4.19.2"
+  },
+  "engines": { "node": ">=20.0.0" }
 }
