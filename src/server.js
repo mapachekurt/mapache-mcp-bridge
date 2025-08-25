@@ -8,74 +8,84 @@ import {
   MCPServerStdio
 } from "@openai/agents";
 
-/**
- * ENV:
- *  OPENAI_API_KEY                (required)
- *  MCP_HOSTED_LABELS_URLS        (optional) e.g. linear=https://<linear-mcp>/mcp
- *  MCP_STREAMABLE_URLS           (optional) e.g. https://<n8n-mcp-sse>.railway.app
- *  MCP_STDIO_COMMANDS            (optional) e.g. "npx -y @modelcontextprotocol/server-filesystem ./data"
- *  AGENT_NAME                    (optional)
- *  AGENT_INSTRUCTIONS            (optional)
- */
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "4mb" }));
 
+let agent;
+let connected = { hosted: [], streamable: [] };
+let servers = [];
+
 async function buildAgent() {
   const tools = [];
-  const mcpServers = [];
+  connected = { hosted: [], streamable: [] };
+  servers = [];
 
-  // Hosted HTTP MCP servers (Responses API executes remote tools)
+  // Hosted HTTP MCP (executed by Responses API)
   (process.env.MCP_HOSTED_LABELS_URLS || "")
     .split(",").map(s => s.trim()).filter(Boolean)
     .forEach(pair => {
       const [label, url] = pair.split("=").map(x => x.trim());
       tools.push(hostedMcpTool({ serverLabel: label, serverUrl: url }));
+      connected.hosted.push({ label, url });
     });
 
-  // Streamable HTTP/SSE MCP servers (SDK talks directly)
+  // Streamable HTTP/SSE MCP (SDK talks directly)
   (process.env.MCP_STREAMABLE_URLS || "")
     .split(",").map(s => s.trim()).filter(Boolean)
     .forEach(url => {
-      mcpServers.push(new MCPServerStreamableHttp({ url, name: `http-${new URL(url).hostname}` }));
+      const name = `http-${new URL(url).hostname}`;
+      servers.push(new MCPServerStreamableHttp({ url, name }));
+      connected.streamable.push({ name, url });
     });
 
-  // stdio MCP servers
+  // stdio MCP
   (process.env.MCP_STDIO_COMMANDS || "")
     .split(",").map(s => s.trim()).filter(Boolean)
-    .forEach(fullCommand => {
-      mcpServers.push(new MCPServerStdio({ name: `stdio-${Date.now()}`, fullCommand }));
+    .forEach(cmd => {
+      const name = `stdio-${Date.now()}`;
+      servers.push(new MCPServerStdio({ name, fullCommand: cmd }));
+      connected.streamable.push({ name, cmd });
     });
 
-  const agent = new Agent({
+  const a = new Agent({
     name: process.env.AGENT_NAME || "Mapache MCP Bridge",
-    instructions: process.env.AGENT_INSTRUCTIONS ||
-      "Use MCP tools when available. Prefer precise tool calls over guesses.",
+    instructions: process.env.AGENT_INSTRUCTIONS || "Use MCP tools when available.",
     tools,
-    mcpServers
+    mcpServers: servers
   });
 
-  for (const s of mcpServers) await s.connect();
-  return agent;
+  // Don’t crash if an MCP endpoint is down/placeholder
+  for (const s of servers) {
+    try { await s.connect(); }
+    catch (e) { console.error("MCP connect error:", s.name, e?.message); }
+  }
+
+  return a;
 }
 
-const agent = await buildAgent();
+agent = await buildAgent();
+
+app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
+
+app.get("/tools", (_req, res) => {
+  res.json({
+    hosted: connected.hosted,
+    streamable: connected.streamable,
+    count: connected.hosted.length + connected.streamable.length
+  });
+});
 
 app.post("/run", async (req, res) => {
   try {
-    const userInput = req.body?.prompt ?? "";
-    const result = await run(agent, userInput, { stream: false });
+    if (!agent) agent = await buildAgent();
+    const prompt = req.body?.prompt ?? "";
+    const result = await run(agent, prompt, { stream: false });
     res.json({
       output: result.finalOutput,
       toolEvents: result.toolEvents ?? [],
       citations: result.citations ?? []
     });
   } catch (e) {
-    res.status(500).json({ error: e?.message || String(e) });
-  }
-});
-
-app.get("/healthz", (_, res) => res.send("ok"));
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`MCP bridge listening on :${port}`));
+    console.error("RUN ERROR", e);
+    res.status(500).json({ error: e?.message || String
