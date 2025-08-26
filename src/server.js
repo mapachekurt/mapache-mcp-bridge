@@ -22,14 +22,21 @@ async function linearGql(query, variables = {}) {
   if (!LINEAR_API_KEY) {
     throw new Error("LINEAR_API_KEY not set");
   }
+
+  // Linear expects the API key itself in the Authorization header (no "Bearer ").
+  const rawKey = LINEAR_API_KEY || "";
+  const authValue = rawKey.replace(/^Bearer\s+/i, "").trim();
+
   const res = await fetch(LINEAR_GQL_ENDPOINT, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${LINEAR_API_KEY}`,
+      "accept": "application/json",
+      "authorization": authValue, // <-- key only, no Bearer prefix
     },
     body: JSON.stringify({ query, variables }),
   });
+
   const json = await res.json().catch(() => ({}));
   if (!res.ok || json?.errors) {
     throw new Error(
