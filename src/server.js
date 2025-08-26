@@ -222,6 +222,82 @@ app.get("/linear/comments", async (req, res) => {
   }
 });
 
+// ------- Linear: issueCreate (deterministic fallback) -------
+app.post('/linear/issueCreate', async (req, res) => {
+  try {
+    const { teamId, title, description = '', labels = [], priority = 0 } = req.body || {};
+    if (!process.env.LINEAR_API_KEY) return res.status(500).json({ error: 'LINEAR_API_KEY missing' });
+    if (!teamId || !title) return res.status(400).json({ error: 'teamId and title are required' });
+
+    // 1) resolve backlog workflowStateId for team
+    const qStates = `
+      query($id: String!) {
+        team(id: $id) {
+          id
+          states {
+            nodes { id name type }
+          }
+        }
+      }`;
+    const rStates = await fetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': process.env.LINEAR_API_KEY },
+      body: JSON.stringify({ query: qStates, variables: { id: teamId } })
+    }).then(r => r.json());
+
+    if (rStates.errors) return res.status(400).json({ error: 'Linear states error', details: rStates.errors });
+    const states = rStates?.data?.team?.states?.nodes || [];
+    const backlog = states.find(s => s.type?.toLowerCase() === 'backlog') || states.find(s => /backlog/i.test(s.name));
+    if (!backlog) return res.status(400).json({ error: 'Backlog state not found for team', states });
+
+    // 2) create issue
+    const qCreate = `
+      mutation IssueCreate($input: IssueCreateInput!) {
+        issueCreate(input: $input) {
+          success
+          issue { id identifier title url }
+        }
+      }`;
+    const input = {
+      teamId,
+      title,
+      description,
+      priority,
+      workflowStateId: backlog.id,
+      labelIds: labels // array of label IDs if you have them; otherwise leave empty
+    };
+    const rCreate = await fetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': process.env.LINEAR_API_KEY },
+      body: JSON.stringify({ query: qCreate, variables: { input } })
+    }).then(r => r.json());
+
+    if (rCreate.errors) return res.status(400).json({ error: 'Linear create error', details: rCreate.errors });
+    return res.json(rCreate.data.issueCreate);
+  } catch (e) {
+    console.error('issueCreate error', e);
+    return res.status(500).json({ error: 'issueCreate failed', message: String(e) });
+  }
+});
+
+// ------- Linear: teams (for discovery) -------
+app.get('/linear/teams', async (_req, res) => {
+  try {
+    if (!process.env.LINEAR_API_KEY) return res.status(500).json({ error: 'LINEAR_API_KEY missing' });
+    const q = `query { teams(first: 50) { nodes { id key name url } } }`;
+    const r = await fetch('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': process.env.LINEAR_API_KEY },
+      body: JSON.stringify({ query: q })
+    }).then(r => r.json());
+    if (r.errors) return res.status(400).json({ error: 'Linear teams error', details: r.errors });
+    res.json(r.data.teams.nodes);
+  } catch (e) {
+    console.error('teams error', e);
+    res.status(500).json({ error: 'teams failed', message: String(e) });
+  }
+});
+
 // ───────────────────────────────────────────────────────────────
 // Run an instruction through the agent (uses MCP if configured)
 // ───────────────────────────────────────────────────────────────

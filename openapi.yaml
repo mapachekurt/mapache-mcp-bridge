@@ -124,3 +124,56 @@ paths:
                         id: { type: string }
                         body: { type: string }
                         createdAt: { type: string }
+
+  /linear/issueCreate:
+    post:
+      operationId: linearIssueCreate
+      description: Create a Linear issue in the team's Backlog (deterministic fallback).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId, title]
+              properties:
+                teamId: { type: string }
+                title:  { type: string }
+                description: { type: string }
+                labels: { type: array, items: { type: string } }
+                priority: { type: integer, minimum: 0, maximum: 4 }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  issue:
+                    type: object
+                    properties:
+                      id:         { type: string }
+                      identifier: { type: string }
+                      title:      { type: string }
+                      url:        { type: string }
+
+  /linear/teams:
+    get:
+      operationId: linearTeams
+      description: List Linear teams for discovery.
+      responses:
+        "200":
+          description: Teams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:   { type: string }
+                    key:  { type: string }
+                    name: { type: string }
+                    url:  { type: string }
