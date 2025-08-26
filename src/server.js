@@ -284,7 +284,7 @@ app.post('/linear/issueCreate', async (req, res) => {
 app.get('/linear/teams', async (_req, res) => {
   try {
     if (!process.env.LINEAR_API_KEY) return res.status(500).json({ error: 'LINEAR_API_KEY missing' });
-    const q = `query { teams(first: 50) { nodes { id key name url } } }`;
+    const q = `query { teams(first: 50) { nodes { id key name } } }`;
     const r = await fetch('https://api.linear.app/graphql', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': process.env.LINEAR_API_KEY },

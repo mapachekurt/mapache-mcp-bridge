@@ -176,4 +176,3 @@ paths:
                     id:   { type: string }
                     key:  { type: string }
                     name: { type: string }
-                    url:  { type: string }
