@@ -156,8 +156,12 @@ app.post("/linear/commentCreate", async (req, res) => {
     const input = {
       issueId,
       body,
-      clientMutationId: clientMutationId || `mapache-${Date.now()}`,
     };
+    
+    // Add clientMutationId only if explicitly provided
+    if (clientMutationId) {
+      input.clientMutationId = clientMutationId;
+    }
 
     const createRes = await linearGql(mutation, { input });
     const success = !!createRes?.commentCreate?.success;
