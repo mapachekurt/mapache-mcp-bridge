@@ -8,8 +8,8 @@ iwr "$env:APP/healthz" | % Content
 # 2) Tools (should show 'linear' under hosted)
 iwr "$env:APP/tools" | % Content
 
-# 3) /run smoke: nudge agent to use Linear MCP
-$body = @{ prompt = "List my Linear teams (names + IDs). If auth is needed, follow the hosted MCP flow." } | ConvertTo-Json -Depth 4
+# 3) /run smoke: test MCP agent with simple Linear query
+$body = @{ prompt = "What Linear tools do you have access to?" } | ConvertTo-Json -Depth 4
 irm -Method Post -Uri "$env:APP/run" -ContentType "application/json" -Body $body
 
 # 4) (optional) deterministic fallback create:
