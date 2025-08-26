@@ -1,9 +1,9 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: Mapache MCP Bridge
-  version: "1.1.0"
+  version: 1.1.2
 servers:
-  - url: /
+  - url: https://mapache-mcp-bridge-production.up.railway.app
 paths:
   /healthz:
     get:
@@ -13,7 +13,9 @@ paths:
           description: ok
           content:
             text/plain:
-              schema: { type: string }
+              schema:
+                type: string
+
   /tools:
     get:
       operationId: tools
@@ -26,9 +28,17 @@ paths:
               schema:
                 type: object
                 properties:
-                  hosted: { type: array, items: { type: object } }
-                  streamable: { type: array, items: { type: object } }
-                  count: { type: integer }
+                  hosted:
+                    type: array
+                    items:
+                      type: object
+                  streamable:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+
   /run:
     post:
       operationId: run
@@ -43,6 +53,7 @@ paths:
               properties:
                 prompt:
                   type: string
+                  description: The user's instruction for the agent.
       responses:
         "200":
           description: Agent response
@@ -51,113 +62,14 @@ paths:
               schema:
                 type: object
                 properties:
-                  output: { type: string }
-                  toolEvents: { type: array, items: { type: object } }
-                  citations: { type: array, items: { type: object } }
-        "500":
-          description: Error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error: { type: string }
-
-  /linear/commentCreate:
-    post:
-      operationId: linear_commentCreate
-      description: Create a Linear comment on an issue and verify persistence.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [issueId, body]
-              properties:
-                issueId: { type: string, description: "Linear issue UUID" }
-                body:    { type: string, description: "Comment body (markdown supported)" }
-                clientMutationId: { type: string }
-      responses:
-        "200":
-          description: Created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  comment:
-                    type: object
-                    properties:
-                      id: { type: string }
-                      body: { type: string }
-                      createdAt: { type: string }
-        "4XX":
-          description: Request error
-        "5XX":
-          description: Upstream or verification failure
-
-  /linear/comments:
-    get:
-      operationId: linear_comments
-      description: List comments for a Linear issue.
-      parameters:
-        - in: query
-          name: issueId
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  issue: { type: string }
-                  comments:
+                  output:
+                    type: string
+                  toolEvents:
                     type: array
-                    items:
-                      type: object
-                      properties:
-                        id: { type: string }
-                        body: { type: string }
-                        createdAt: { type: string }
-
-  /linear/issueCreate:
-    post:
-      operationId: linearIssueCreate
-      description: Create a Linear issue in the team's Backlog (deterministic fallback).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [teamId, title]
-              properties:
-                teamId: { type: string }
-                title:  { type: string }
-                description: { type: string }
-                labels: { type: array, items: { type: string } }
-                priority: { type: integer, minimum: 0, maximum: 4 }
-      responses:
-        "200":
-          description: Created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  issue:
-                    type: object
-                    properties:
-                      id:         { type: string }
-                      identifier: { type: string }
-                      title:      { type: string }
-                      url:        { type: string }
+                    items: { type: object }
+                  citations:
+                    type: array
+                    items: { type: object }
 
   /linear/teams:
     get:
@@ -176,3 +88,43 @@ paths:
                     id:   { type: string }
                     key:  { type: string }
                     name: { type: string }
+                    url:  { type: string, format: uri }
+
+  /linear/issueCreate:
+    post:
+      operationId: linearIssueCreate
+      description: Create a Linear issue in the team's Backlog (deterministic fallback).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [teamId, title]
+              properties:
+                teamId: { type: string }
+                title:  { type: string }
+                description: { type: string }
+                labels:
+                  type: array
+                  items: { type: string }
+                priority:
+                  type: integer
+                  minimum: 0
+                  maximum: 4
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  issue:
+                    type: object
+                    properties:
+                      id:         { type: string }
+                      identifier: { type: string }
+                      title:      { type: string }
+                      url:        { type: string, format: uri }
