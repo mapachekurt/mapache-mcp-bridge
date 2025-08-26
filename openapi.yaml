@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Mapache MCP Bridge
-  version: "1.0.1"
+  version: "1.1.0"
 servers:
   - url: /
 paths:
@@ -39,10 +39,10 @@ paths:
           application/json:
             schema:
               type: object
+              required: [prompt]
               properties:
                 prompt:
                   type: string
-                  description: The user's instruction for the agent.
       responses:
         "200":
           description: Agent response
@@ -62,3 +62,65 @@ paths:
                 type: object
                 properties:
                   error: { type: string }
+
+  /linear/commentCreate:
+    post:
+      operationId: linear_commentCreate
+      description: Create a Linear comment on an issue and verify persistence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [issueId, body]
+              properties:
+                issueId: { type: string, description: "Linear issue UUID" }
+                body:    { type: string, description: "Comment body (markdown supported)" }
+                clientMutationId: { type: string }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  comment:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      body: { type: string }
+                      createdAt: { type: string }
+        "4XX":
+          description: Request error
+        "5XX":
+          description: Upstream or verification failure
+
+  /linear/comments:
+    get:
+      operationId: linear_comments
+      description: List comments for a Linear issue.
+      parameters:
+        - in: query
+          name: issueId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issue: { type: string }
+                  comments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        body: { type: string }
+                        createdAt: { type: string }
