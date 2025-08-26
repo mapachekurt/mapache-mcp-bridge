@@ -1,0 +1,83 @@
+workflows:
+
+  # ───────────── Session setup ─────────────
+  - name: Mapache · Set APP base (Railway URL)
+    description: Set $env:APP once per session.
+    command: |
+      $env:APP="{{app_base}}"; Write-Host "APP set to $env:APP"
+    inputs:
+      - name: app_base
+        default: https://mapache-mcp-bridge-production.up.railway.app
+        placeholder: https://<your-app>.up.railway.app
+
+  - name: Mapache · Set Linear Issue UUID
+    description: Cache the Linear issue UUID for comment tests.
+    command: |
+      $env:ISSUE="{{issue_uuid}}"; Write-Host "ISSUE set to $env:ISSUE"
+    inputs:
+      - name: issue_uuid
+        placeholder: 01J7… (Linear issue UUID, not ENG-123)
+
+  # ───────────── Health & inventory ─────────────
+  - name: Mapache · Health
+    command: |
+      if (-not $env:APP) { Write-Error "APP not set."; exit 1 }
+      Invoke-RestMethod "$env:APP/healthz" | Out-String
+
+  - name: Mapache · Tools
+    command: |
+      if (-not $env:APP) { Write-Error "APP not set."; exit 1 }
+      Invoke-RestMethod "$env:APP/tools" | ConvertTo-Json -Depth 5
+
+  # ───────────── Agent /run ─────────────
+  - name: Mapache · Run prompt via /run
+    command: |
+      if (-not $env:APP) { Write-Error "APP not set."; exit 1 }
+      $body = @{ prompt = "{{prompt}}" } | ConvertTo-Json -Depth 4
+      Invoke-RestMethod -Method Post -Uri "$env:APP/run" -ContentType "application/json" -Body $body
+    inputs:
+      - name: prompt
+        placeholder: Say 'bridge online'.
+
+  # ───────────── Linear (deterministic GraphQL through bridge) ─────────────
+  - name: Linear · Create comment
+    command: |
+      if (-not $env:APP)   { Write-Error "APP not set."; exit 1 }
+      if (-not $env:ISSUE) { Write-Error "ISSUE not set. Run 'Mapache · Set Linear Issue UUID'."; exit 1 }
+      $create = @{ issueId = "$env:ISSUE"; body = "{{body}}" } | ConvertTo-Json -Depth 4
+      Invoke-RestMethod -Method Post -Uri "$env:APP/linear/commentCreate" -ContentType "application/json" -Body $create
+    inputs:
+      - name: body
+        default: Bridge created this via MCP fallback.
+        placeholder: Comment text
+
+  - name: Linear · List comments
+    command: |
+      if (-not $env:APP)   { Write-Error "APP not set."; exit 1 }
+      if (-not $env:ISSUE) { Write-Error "ISSUE not set."; exit 1 }
+      Invoke-RestMethod "$env:APP/linear/comments?issueId=$env:ISSUE" | ConvertTo-Json -Depth 5
+
+  # ───────────── Railway helpers (optional; require Railway CLI) ─────────────
+  - name: Railway · Set OPENAI_API_KEY
+    command: railway variables --set OPENAI_API_KEY="{{key}}"
+    inputs:
+      - name: key
+        secret: true
+
+  - name: Railway · Set LINEAR_API_KEY
+    command: railway variables --set LINEAR_API_KEY="{{key}}"
+    inputs:
+      - name: key
+        secret: true
+
+  - name: Railway · Set MCP_HOSTED_LABELS_URLS (Pipedream Linear)
+    command: railway variables --set MCP_HOSTED_LABELS_URLS="linear={{url}}"
+    inputs:
+      - name: url
+        default: https://mcp.pipedream.net/18d9d87e-0c62-4efa-820b-907222686efc/linear
+
+  - name: Railway · Redeploy bridge
+    command: railway redeploy -s mapache-mcp-bridge -y
+
+  - name: Railway · Logs (tail)
+    command: railway logs
