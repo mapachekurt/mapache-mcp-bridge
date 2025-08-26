@@ -263,7 +263,7 @@ app.post('/linear/issueCreate', async (req, res) => {
       title,
       description,
       priority,
-      workflowStateId: backlog.id,
+      stateId: backlog.id,
       labelIds: labels // array of label IDs if you have them; otherwise leave empty
     };
     const rCreate = await fetch('https://api.linear.app/graphql', {
